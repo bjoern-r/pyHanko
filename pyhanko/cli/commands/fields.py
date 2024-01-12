@@ -1,4 +1,6 @@
 import click
+import getpass
+from pyhanko.pdf_utils import crypt
 
 from pyhanko.cli.commands.signing import signing
 from pyhanko.cli.runtime import pyhanko_exception_manager
@@ -22,9 +24,24 @@ __all__ = ['list_sigfields', 'add_sig_field']
     default=False,
     show_default=True,
 )
-def list_sigfields(infile, skip_status):
+@click.option(
+    '--decrypt',
+    help='decrypt by password',
+    required=False,
+    type=bool,
+    is_flag=True,
+    default=False,
+    show_default=True,
+)
+def list_sigfields(infile, skip_status, decrypt=False, password=None):
     with pyhanko_exception_manager():
         r = PdfFileReader(infile, strict=False)
+        if decrypt:
+            if not password:
+                password = getpass.getpass(prompt='File password: ')
+            auth_result = r.decrypt(password)
+            if auth_result.status == crypt.AuthStatus.FAILED:
+                raise click.ClickException("Password didn't match.")
         field_info = fields.enumerate_sig_fields(r)
         for ix, (name, value, field_ref) in enumerate(field_info):
             if skip_status:
